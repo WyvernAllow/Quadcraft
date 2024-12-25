@@ -1,7 +1,9 @@
+#include <stdbool.h>
 #include <stddef.h>
 #include <stdio.h>
 #include <stdlib.h>
 
+#include "camera.h"
 #include "utils.h"
 
 #define GLFW_INCLUDE_NONE
@@ -13,10 +15,54 @@ static void glfw_error_callback(int error_code, const char *description) {
     fprintf(stderr, "GLFW: %s\n", description);
 }
 
+struct camera camera;
+
 static void glfw_framebuffer_size_callback(GLFWwindow *window, int width,
                                            int height) {
     (void)window;
+    camera.aspect = width / (float)height;
     glViewport(0, 0, width, height);
+}
+
+float last_x = 800 / 2.0f;
+float last_y = 450 / 2.0f;
+bool first_mouse = true;
+bool unfocused = false;
+
+static void glfw_cursor_pos_callback(GLFWwindow *window, double x, double y) {
+    (void)window;
+
+    if (unfocused) {
+        return;
+    }
+
+    if (first_mouse) {
+        last_x = x;
+        last_y = y;
+        first_mouse = false;
+    }
+
+    float delta_x = x - last_x;
+    float delta_y = y - last_y;
+
+    last_x = x;
+    last_y = y;
+
+    camera.pitch_deg -= delta_y * 0.25f;
+    camera.yaw_deg += delta_x * 0.25f;
+}
+
+static void glfw_key_callback(GLFWwindow *window, int key, int scancode,
+                              int action, int mods) {
+    (void)window;
+    (void)scancode;
+    (void)mods;
+
+    if (key == GLFW_KEY_ESCAPE && action == GLFW_PRESS) {
+        unfocused = true;
+        first_mouse = true;
+        glfwSetInputMode(window, GLFW_CURSOR, GLFW_CURSOR_NORMAL);
+    }
 }
 
 static GLuint compile_shader(const char *source, GLenum type) {
@@ -96,6 +142,9 @@ int main(void) {
     }
 
     glfwSetFramebufferSizeCallback(window, glfw_framebuffer_size_callback);
+    glfwSetInputMode(window, GLFW_CURSOR, GLFW_CURSOR_DISABLED);
+    glfwSetCursorPosCallback(window, glfw_cursor_pos_callback);
+    glfwSetKeyCallback(window, glfw_key_callback);
 
     glfwMakeContextCurrent(window);
 
@@ -112,10 +161,10 @@ int main(void) {
     }
 
     struct vertex vertices[] = {
-        {0.5f, 0.5f, 0.0f},    // top right
-        {0.5f, -0.5f, 0.0f},   // bottom right
-        {-0.5f, -0.5f, 0.0f},  // bottom left
-        {-0.5f, 0.5f, 0.0f},   // top left
+        {0.5f, 0.5f, -1.0f},    // top right
+        {0.5f, -0.5f, -1.0f},   // bottom right
+        {-0.5f, -0.5f, -1.0f},  // bottom left
+        {-0.5f, 0.5f, -1.0f},   // top left
     };
 
     uint16_t indices[] = {
@@ -145,13 +194,56 @@ int main(void) {
 
     glBindVertexArray(0);
 
+    camera_init(&camera, 90.0f, 800.0f / 450.0f);
+
+    camera.position.z = 3.0f;
+
+    camera_update(&camera);
+
+    float current_time = glfwGetTime();
+
     while (!glfwWindowShouldClose(window)) {
         glfwPollEvents();
+
+        float new_time = glfwGetTime();
+        float delta_time = new_time - current_time;
+        current_time = new_time;
+
+        if (glfwGetMouseButton(window, GLFW_MOUSE_BUTTON_1) && unfocused) {
+            unfocused = false;
+            glfwSetInputMode(window, GLFW_CURSOR, GLFW_CURSOR_DISABLED);
+        }
+
+        struct vec3 wishdir = {0};
+        if (glfwGetKey(window, GLFW_KEY_W) == GLFW_PRESS) {
+            wishdir = vec3_add(wishdir, camera.forward);
+        }
+
+        if (glfwGetKey(window, GLFW_KEY_S) == GLFW_PRESS) {
+            wishdir = vec3_sub(wishdir, camera.forward);
+        }
+
+        if (glfwGetKey(window, GLFW_KEY_A) == GLFW_PRESS) {
+            wishdir = vec3_sub(wishdir, camera.right);
+        }
+
+        if (glfwGetKey(window, GLFW_KEY_D) == GLFW_PRESS) {
+            wishdir = vec3_add(wishdir, camera.right);
+        }
+
+        camera.position =
+            vec3_add(camera.position,
+                     vec3_scale(vec3_normalize(wishdir), delta_time * 5.0f));
+
+        camera_update(&camera);
 
         glClearColor(0.2f, 0.3f, 0.3f, 1.0f);
         glClear(GL_COLOR_BUFFER_BIT);
 
         glUseProgram(program);
+        glUniformMatrix4fv(glGetUniformLocation(program, "u_mvp"), 1, GL_FALSE,
+                           camera.view_proj.m);
+
         glBindVertexArray(vao);
         glDrawElements(GL_TRIANGLES, 6, GL_UNSIGNED_SHORT, 0);
         glBindVertexArray(0);
