@@ -6,6 +6,7 @@ add_executable(${PROJECT_NAME}
 )
 
 set_property(TARGET ${PROJECT_NAME} PROPERTY C_STANDARD 99)
+target_compile_definitions(${PROJECT_NAME} PRIVATE _CRT_SECURE_NO_WARNINGS)
 
 if(MSVC)
     target_compile_options(${PROJECT_NAME} PRIVATE /W4)
