@@ -125,6 +125,10 @@ struct vertex {
     float position[3];
 };
 
+#define MAX_QUAD_COUNT 1024
+#define MAX_VERTEX_COUNT (MAX_QUAD_COUNT * 4)
+#define MAX_INDEX_COUNT (MAX_QUAD_COUNT * 6)
+
 int main(void) {
     glfwSetErrorCallback(glfw_error_callback);
     if (!glfwInit()) {
@@ -153,6 +157,8 @@ int main(void) {
         return EXIT_FAILURE;
     }
 
+    glEnable(GL_CULL_FACE);
+
     GLuint program =
         load_program("res/shaders/chunk.vert", "res/shaders/chunk.frag");
     if (!program) {
@@ -167,10 +173,16 @@ int main(void) {
         {-0.5f, 0.5f, -1.0f},   // top left
     };
 
-    uint16_t indices[] = {
-        0, 1, 3,  // first triangle
-        1, 2, 3   // second triangle
-    };
+    uint16_t indices[MAX_INDEX_COUNT];
+    uint16_t offset = 0;
+    for (uint16_t i = 0; i < MAX_INDEX_COUNT; i += 6) {
+        indices[i + 0] = offset + 3;
+        indices[i + 1] = offset + 1;
+        indices[i + 2] = offset + 0;
+        indices[i + 3] = offset + 3;
+        indices[i + 4] = offset + 2;
+        indices[i + 5] = offset + 1;
+    }
 
     GLuint vao;
     glGenVertexArrays(1, &vao);
