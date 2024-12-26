@@ -1,9 +1,11 @@
+#include <math.h>
 #include <stdbool.h>
 #include <stddef.h>
 #include <stdio.h>
 #include <stdlib.h>
 
 #include "camera.h"
+#include "chunk.h"
 #include "utils.h"
 
 #define GLFW_INCLUDE_NONE
@@ -122,12 +124,88 @@ static GLuint load_program(const char *vert_filename,
 }
 
 struct vertex {
-    float position[3];
+    struct vec3 position;
+    struct vec3 normal;
 };
 
-#define MAX_QUAD_COUNT 1024
+#define MAX_QUAD_COUNT 5000000
 #define MAX_VERTEX_COUNT (MAX_QUAD_COUNT * 4)
 #define MAX_INDEX_COUNT (MAX_QUAD_COUNT * 6)
+
+struct vertex *vertices;
+size_t vertex_count;
+
+// clang-format off
+static const struct vec3 NORMAL_LUT[DIR_COUNT] = {
+    [DIR_POS_X] = { 1.0f,  0.0f,  0.0f},
+    [DIR_POS_Y] = { 0.0f,  1.0f,  0.0f},
+    [DIR_POS_Z] = { 0.0f,  0.0f,  1.0f},
+    [DIR_NEG_X] = {-1.0f,  0.0f,  0.0f},
+    [DIR_NEG_Y] = { 0.0f, -1.0f,  0.0f},
+    [DIR_NEG_Z] = { 0.0f,  0.0f, -1.0f},
+};
+// clang-format on
+
+static void add_quad(struct vec3 offset, struct vec3 normal) {
+    struct vec3 up = {0.0f, 1.0f, 0.0f};
+    if (fabsf(normal.y) > 0.9f) {
+        up = (struct vec3){1.0f, 0.0f, 0.0f};
+    }
+
+    struct vec3 tangent = vec3_normalize(vec3_cross(up, normal));
+    struct vec3 bitangent = vec3_cross(normal, tangent);
+
+    struct vec3 positions[4] = {
+        vec3_add(offset, vec3_add(vec3_scale(tangent, -0.5f),
+                                  vec3_scale(bitangent, -0.5f))),
+        vec3_add(offset, vec3_add(vec3_scale(tangent, 0.5f),
+                                  vec3_scale(bitangent, -0.5f))),
+        vec3_add(offset, vec3_add(vec3_scale(tangent, 0.5f),
+                                  vec3_scale(bitangent, 0.5f))),
+        vec3_add(offset, vec3_add(vec3_scale(tangent, -0.5f),
+                                  vec3_scale(bitangent, 0.5f))),
+    };
+
+    for (int i = 0; i < 4; i++) {
+        vertices[vertex_count].position =
+            vec3_add(positions[i], (struct vec3){0.5f, 0.5f, 0.5f});
+        vertices[vertex_count].normal = normal;
+        vertex_count++;
+    }
+}
+
+void mesh_chunk(struct chunk *chunk) {
+    vertex_count = 0;
+
+    for (size_t z = 0; z < CHUNK_SIZE_Z; z++) {
+        for (size_t y = 0; y < CHUNK_SIZE_Y; y++) {
+            for (size_t x = 0; x < CHUNK_SIZE_X; x++) {
+                enum block_type current_block = chunk_get_block(chunk, x, y, z);
+                if (current_block != BLOCK_AIR) {
+                    for (enum direction dir = 0; dir < DIR_COUNT; dir++) {
+                        struct vec3 position = {x, y, z};
+
+                        struct vec3 normal = NORMAL_LUT[dir];
+                        struct vec3 adjacent = vec3_add(position, normal);
+
+                        enum block_type compare_block =
+                            chunk_get_block(chunk, (int)adjacent.x,
+                                            (int)adjacent.y, (int)adjacent.z);
+
+                        if (compare_block == BLOCK_AIR) {
+                            add_quad(
+                                vec3_add(vec3_scale(normal, 0.5), position),
+                                normal);
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    float buffer_usage = ((float)vertex_count / MAX_VERTEX_COUNT) * 100.0f;
+    printf("Buffer usage: %.2f%%\n", buffer_usage);
+}
 
 int main(void) {
     glfwSetErrorCallback(glfw_error_callback);
@@ -136,10 +214,18 @@ int main(void) {
         return EXIT_FAILURE;
     }
 
+    GLFWmonitor *primary_monitor = glfwGetPrimaryMonitor();
+    const GLFWvidmode *video_mode = glfwGetVideoMode(primary_monitor);
+
     glfwWindowHint(GLFW_CONTEXT_VERSION_MAJOR, 4);
     glfwWindowHint(GLFW_CONTEXT_VERSION_MINOR, 1);
     glfwWindowHint(GLFW_OPENGL_PROFILE, GLFW_OPENGL_CORE_PROFILE);
-    GLFWwindow *window = glfwCreateWindow(800, 450, "Quadcraft", NULL, NULL);
+    glfwWindowHint(GLFW_RED_BITS, video_mode->redBits);
+    glfwWindowHint(GLFW_GREEN_BITS, video_mode->greenBits);
+    glfwWindowHint(GLFW_BLUE_BITS, video_mode->blueBits);
+    glfwWindowHint(GLFW_REFRESH_RATE, video_mode->refreshRate);
+    GLFWwindow *window = glfwCreateWindow(video_mode->width, video_mode->height,
+                                          "Quadcraft", primary_monitor, NULL);
     if (!window) {
         fprintf(stderr, "glfwCreateWindow failed\n");
         return EXIT_FAILURE;
@@ -158,6 +244,10 @@ int main(void) {
     }
 
     glEnable(GL_CULL_FACE);
+    glEnable(GL_DEPTH_TEST);
+
+    struct chunk chunk0;
+    chunk_init(&chunk0);
 
     GLuint program =
         load_program("res/shaders/chunk.vert", "res/shaders/chunk.frag");
@@ -166,23 +256,22 @@ int main(void) {
         return EXIT_FAILURE;
     }
 
-    struct vertex vertices[] = {
-        {0.5f, 0.5f, -1.0f},    // top right
-        {0.5f, -0.5f, -1.0f},   // bottom right
-        {-0.5f, -0.5f, -1.0f},  // bottom left
-        {-0.5f, 0.5f, -1.0f},   // top left
-    };
-
-    uint16_t indices[MAX_INDEX_COUNT];
-    uint16_t offset = 0;
-    for (uint16_t i = 0; i < MAX_INDEX_COUNT; i += 6) {
-        indices[i + 0] = offset + 3;
+    uint32_t *indices = malloc(sizeof(uint32_t) * MAX_INDEX_COUNT);
+    uint32_t offset = 0;
+    for (uint32_t i = 0; i < MAX_INDEX_COUNT; i += 6) {
+        indices[i + 0] = offset + 0;
         indices[i + 1] = offset + 1;
-        indices[i + 2] = offset + 0;
-        indices[i + 3] = offset + 3;
+        indices[i + 2] = offset + 2;
+        indices[i + 3] = offset + 0;
         indices[i + 4] = offset + 2;
-        indices[i + 5] = offset + 1;
+        indices[i + 5] = offset + 3;
+
+        offset += 4;
     }
+
+    vertices = malloc(sizeof(struct vertex) * MAX_VERTEX_COUNT);
+
+    mesh_chunk(&chunk0);
 
     GLuint vao;
     glGenVertexArrays(1, &vao);
@@ -191,18 +280,24 @@ int main(void) {
     GLuint vbo;
     glGenBuffers(1, &vbo);
     glBindBuffer(GL_ARRAY_BUFFER, vbo);
-    glBufferData(GL_ARRAY_BUFFER, sizeof(vertices), vertices, GL_STATIC_DRAW);
+    glBufferData(GL_ARRAY_BUFFER, sizeof(struct vertex) * MAX_VERTEX_COUNT,
+                 NULL, GL_DYNAMIC_DRAW);
 
     /* Position attribute */
     glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, sizeof(struct vertex),
                           (const void *)offsetof(struct vertex, position));
     glEnableVertexAttribArray(0);
 
+    /* Normal attribute */
+    glVertexAttribPointer(1, 3, GL_FLOAT, GL_FALSE, sizeof(struct vertex),
+                          (const void *)offsetof(struct vertex, normal));
+    glEnableVertexAttribArray(1);
+
     GLuint ebo;
     glGenBuffers(1, &ebo);
     glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, ebo);
-    glBufferData(GL_ELEMENT_ARRAY_BUFFER, sizeof(indices), indices,
-                 GL_STATIC_DRAW);
+    glBufferData(GL_ELEMENT_ARRAY_BUFFER, sizeof(uint32_t) * MAX_INDEX_COUNT,
+                 indices, GL_STATIC_DRAW);
 
     glBindVertexArray(0);
 
@@ -214,6 +309,8 @@ int main(void) {
 
     float current_time = glfwGetTime();
 
+    bool dirty = true;
+
     while (!glfwWindowShouldClose(window)) {
         glfwPollEvents();
 
@@ -221,9 +318,31 @@ int main(void) {
         float delta_time = new_time - current_time;
         current_time = new_time;
 
-        if (glfwGetMouseButton(window, GLFW_MOUSE_BUTTON_1) && unfocused) {
-            unfocused = false;
-            glfwSetInputMode(window, GLFW_CURSOR, GLFW_CURSOR_DISABLED);
+        if (glfwGetMouseButton(window, GLFW_MOUSE_BUTTON_1)) {
+            int x = (int)(camera.position.x + camera.forward.x);
+            int y = (int)(camera.position.y + camera.forward.y);
+            int z = (int)(camera.position.z + camera.forward.z);
+
+            chunk_set_block(&chunk0, x, y, z, BLOCK_AIR);
+            dirty = true;
+        }
+
+        if (glfwGetMouseButton(window, GLFW_MOUSE_BUTTON_2)) {
+            int x = (int)(camera.position.x + camera.forward.x);
+            int y = (int)(camera.position.y + camera.forward.y);
+            int z = (int)(camera.position.z + camera.forward.z);
+
+            chunk_set_block(&chunk0, x, y, z, BLOCK_DIRT);
+            dirty = true;
+        }
+
+        if (dirty) {
+            mesh_chunk(&chunk0);
+
+            glBindBuffer(GL_ARRAY_BUFFER, vbo);
+            glBufferSubData(GL_ARRAY_BUFFER, 0,
+                            sizeof(struct vertex) * vertex_count, vertices);
+            dirty = false;
         }
 
         struct vec3 wishdir = {0};
@@ -250,14 +369,18 @@ int main(void) {
         camera_update(&camera);
 
         glClearColor(0.2f, 0.3f, 0.3f, 1.0f);
-        glClear(GL_COLOR_BUFFER_BIT);
+        glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 
         glUseProgram(program);
+
+        glBindVertexArray(vao);
         glUniformMatrix4fv(glGetUniformLocation(program, "u_mvp"), 1, GL_FALSE,
                            camera.view_proj.m);
 
-        glBindVertexArray(vao);
-        glDrawElements(GL_TRIANGLES, 6, GL_UNSIGNED_SHORT, 0);
+        size_t quad_count = (vertex_count / 4);
+
+        glDrawElements(GL_TRIANGLES, quad_count * 6, GL_UNSIGNED_INT, 0);
+
         glBindVertexArray(0);
         glUseProgram(0);
 
