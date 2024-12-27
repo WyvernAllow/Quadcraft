@@ -197,7 +197,7 @@ void mesh_chunk(struct chunk *chunk) {
                             chunk_get_block(chunk, (int)adjacent.x,
                                             (int)adjacent.y, (int)adjacent.z);
 
-                        if (compare_block == BLOCK_AIR || compare_block) {
+                        if (compare_block == BLOCK_AIR) {
                             add_quad(
                                 vec3_add(vec3_scale(normal, 0.5), position),
                                 normal, properties->textures[dir]);
