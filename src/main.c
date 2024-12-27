@@ -1,4 +1,5 @@
 #include <math.h>
+#include <stb_image.h>
 #include <stdbool.h>
 #include <stddef.h>
 #include <stdio.h>
@@ -126,6 +127,7 @@ static GLuint load_program(const char *vert_filename,
 struct vertex {
     struct vec3 position;
     struct vec3 normal;
+    float layer;
 };
 
 #define MAX_QUAD_COUNT 5000000
@@ -146,7 +148,7 @@ static const struct vec3 NORMAL_LUT[DIR_COUNT] = {
 };
 // clang-format on
 
-static void add_quad(struct vec3 offset, struct vec3 normal) {
+static void add_quad(struct vec3 offset, struct vec3 normal, float layer) {
     struct vec3 up = {0.0f, 1.0f, 0.0f};
     if (fabsf(normal.y) > 0.9f) {
         up = (struct vec3){1.0f, 0.0f, 0.0f};
@@ -170,6 +172,7 @@ static void add_quad(struct vec3 offset, struct vec3 normal) {
         vertices[vertex_count].position =
             vec3_add(positions[i], (struct vec3){0.5f, 0.5f, 0.5f});
         vertices[vertex_count].normal = normal;
+        vertices[vertex_count].layer = layer;
         vertex_count++;
     }
 }
@@ -185,6 +188,8 @@ void mesh_chunk(struct chunk *chunk) {
                     for (enum direction dir = 0; dir < DIR_COUNT; dir++) {
                         struct vec3 position = {x, y, z};
 
+                        const struct block_properties *properties = get_block_properties(current_block);
+
                         struct vec3 normal = NORMAL_LUT[dir];
                         struct vec3 adjacent = vec3_add(position, normal);
 
@@ -192,10 +197,10 @@ void mesh_chunk(struct chunk *chunk) {
                             chunk_get_block(chunk, (int)adjacent.x,
                                             (int)adjacent.y, (int)adjacent.z);
 
-                        if (compare_block == BLOCK_AIR) {
+                        if (compare_block == BLOCK_AIR || compare_block) {
                             add_quad(
                                 vec3_add(vec3_scale(normal, 0.5), position),
-                                normal);
+                                normal, properties->textures[dir]);
                         }
                     }
                 }
@@ -205,6 +210,22 @@ void mesh_chunk(struct chunk *chunk) {
 
     float buffer_usage = ((float)vertex_count / MAX_VERTEX_COUNT) * 100.0f;
     printf("Buffer usage: %.2f%%\n", buffer_usage);
+}
+
+enum block_type place_block = BLOCK_STONE;
+
+void glfw_scroll_callback(GLFWwindow *window, double x, double y) {
+    (void)window;
+    (void)x;
+
+    if(y < 0) {
+        place_block = (place_block - 1) % BLOCK_TYPE_COUNT;
+    }
+    else if(y > 0) {
+        place_block = (place_block + 1) % BLOCK_TYPE_COUNT;
+    }
+
+    printf("Block type: %i\n", place_block);
 }
 
 int main(void) {
@@ -235,6 +256,7 @@ int main(void) {
     glfwSetInputMode(window, GLFW_CURSOR, GLFW_CURSOR_DISABLED);
     glfwSetCursorPosCallback(window, glfw_cursor_pos_callback);
     glfwSetKeyCallback(window, glfw_key_callback);
+    glfwSetScrollCallback(window, glfw_scroll_callback);
 
     glfwMakeContextCurrent(window);
 
@@ -245,6 +267,7 @@ int main(void) {
 
     glEnable(GL_CULL_FACE);
     glEnable(GL_DEPTH_TEST);
+    // glPolygonMode(GL_FRONT_AND_BACK, GL_LINE);
 
     struct chunk chunk0;
     chunk_init(&chunk0);
@@ -293,6 +316,11 @@ int main(void) {
                           (const void *)offsetof(struct vertex, normal));
     glEnableVertexAttribArray(1);
 
+    /* Layer attribute */
+    glVertexAttribPointer(2, 1, GL_FLOAT, GL_FALSE, sizeof(struct vertex),
+                          (const void *)offsetof(struct vertex, layer));
+    glEnableVertexAttribArray(2);
+
     GLuint ebo;
     glGenBuffers(1, &ebo);
     glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, ebo);
@@ -301,6 +329,57 @@ int main(void) {
 
     glBindVertexArray(0);
 
+    GLuint texture_array;
+    glGenTextures(1, &texture_array);
+    glBindTexture(GL_TEXTURE_2D_ARRAY, texture_array);
+
+    size_t num_layers = TEXTURE_ID_COUNT;
+
+    glTexImage3D(GL_TEXTURE_2D_ARRAY,  // Target
+                 0,                    // Mipmap level
+                 GL_RGBA8,             // Internal format
+                 16,                   // Texture width
+                 16,                   // Texture height
+                 num_layers,                  // Number of layers
+                 0,                    // Border (must be 0)
+                 GL_RGBA,              // Format of the pixel data
+                 GL_UNSIGNED_BYTE,     // Data type
+                 NULL);                // Data (NULL means uninitialized)
+
+    uint8_t *error_texture = gen_error_texture_rgba8(16, 16);
+    glTexSubImage3D(GL_TEXTURE_2D_ARRAY, 0, 0, 0, TEXTURE_ERROR, 16, 16, 1, GL_RGBA, GL_UNSIGNED_BYTE, error_texture);
+
+    stbi_set_flip_vertically_on_load(true);
+
+    for (enum texture_id id = 1; id < TEXTURE_ID_COUNT; id++) {
+        const char *texture_path = get_texture_filename(id);
+
+        int w;
+        int h;
+        int num_channels;
+        unsigned char *data =
+            stbi_load(texture_path, &w, &h, &num_channels, STBI_rgb_alpha);
+        if (!data) {
+            fprintf(stderr, "Failed to load texture: %s\n", texture_path);
+            free(error_texture);
+            return EXIT_FAILURE;
+        }
+
+        if (w != 16 || h != 16 || num_channels != 4) {
+            fprintf(stderr,
+                    "Texture dimensions are not 16x16 or have 4 channels\n");
+            free(error_texture);
+            return EXIT_FAILURE;
+        }
+
+        glTexSubImage3D(GL_TEXTURE_2D_ARRAY, 0, 0, 0, id, 16, 16, 1, GL_RGBA, GL_UNSIGNED_BYTE, data);
+    }
+
+    glTexParameteri(GL_TEXTURE_2D_ARRAY, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
+    glTexParameteri(GL_TEXTURE_2D_ARRAY, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
+    glTexParameteri(GL_TEXTURE_2D_ARRAY, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
+    glTexParameteri(GL_TEXTURE_2D_ARRAY, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
+
     camera_init(&camera, 90.0f, 800.0f / 450.0f);
 
     camera.position.z = 3.0f;
@@ -308,8 +387,6 @@ int main(void) {
     camera_update(&camera);
 
     float current_time = glfwGetTime();
-
-    bool dirty = true;
 
     while (!glfwWindowShouldClose(window)) {
         glfwPollEvents();
@@ -324,7 +401,6 @@ int main(void) {
             int z = (int)(camera.position.z + camera.forward.z);
 
             chunk_set_block(&chunk0, x, y, z, BLOCK_AIR);
-            dirty = true;
         }
 
         if (glfwGetMouseButton(window, GLFW_MOUSE_BUTTON_2)) {
@@ -332,17 +408,16 @@ int main(void) {
             int y = (int)(camera.position.y + camera.forward.y);
             int z = (int)(camera.position.z + camera.forward.z);
 
-            chunk_set_block(&chunk0, x, y, z, BLOCK_DIRT);
-            dirty = true;
+            chunk_set_block(&chunk0, x, y, z, place_block);
         }
 
-        if (dirty) {
+        if (chunk0.is_dirty) {
             mesh_chunk(&chunk0);
 
             glBindBuffer(GL_ARRAY_BUFFER, vbo);
             glBufferSubData(GL_ARRAY_BUFFER, 0,
                             sizeof(struct vertex) * vertex_count, vertices);
-            dirty = false;
+            chunk0.is_dirty = false;
         }
 
         struct vec3 wishdir = {0};
@@ -372,6 +447,9 @@ int main(void) {
         glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 
         glUseProgram(program);
+        glActiveTexture(GL_TEXTURE0);
+        glBindTexture(GL_TEXTURE_2D_ARRAY, texture_array);
+        glUniform1i(glGetUniformLocation(program, "u_texture"), 0);
 
         glBindVertexArray(vao);
         glUniformMatrix4fv(glGetUniformLocation(program, "u_mvp"), 1, GL_FALSE,

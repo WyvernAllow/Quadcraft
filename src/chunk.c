@@ -16,9 +16,25 @@ void chunk_init(struct chunk *chunk) {
     chunk->y = 0;
     chunk->z = 0;
 
-    for (size_t i = 0; i < CHUNK_VOLUME; i++) {
-        chunk->blocks[i] = BLOCK_DIRT;
+    for (size_t z = 0; z < CHUNK_SIZE_Z; z++) {
+        for (size_t y = 0; y < CHUNK_SIZE_Y; y++) {
+            for (size_t x = 0; x < CHUNK_SIZE_X; x++) {
+                chunk->blocks[get_index(x, y, z)] = BLOCK_AIR;
+
+                if(y == 8) {
+                    chunk->blocks[get_index(x, y, z)] = BLOCK_GRASS;
+                }
+                else if(y < 3) {
+                    chunk->blocks[get_index(x, y, z)] = BLOCK_STONE;
+                }
+                else if(y < 8) {
+                    chunk->blocks[get_index(x, y, z)] = BLOCK_DIRT;
+                }
+            }
+        }
     }
+
+    chunk->is_dirty = true;
 }
 
 enum block_type chunk_get_block(const struct chunk *chunk, int x, int y,
@@ -36,5 +52,11 @@ void chunk_set_block(struct chunk *chunk, int x, int y, int z,
         return;
     }
 
+    enum block_type old_block = chunk->blocks[get_index(x, y, z)];
+    if(type == old_block) {
+        return;
+    }
+
     chunk->blocks[get_index(x, y, z)] = type;
+    chunk->is_dirty = true;
 }

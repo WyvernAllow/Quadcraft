@@ -3,6 +3,7 @@ project(quadcraft VERSION 0.1.0 LANGUAGES C)
 
 add_executable(${PROJECT_NAME}
     src/block.h
+    src/block.c
     src/camera.c
     src/camera.h
     src/chunk.c
@@ -10,6 +11,8 @@ add_executable(${PROJECT_NAME}
     src/lmath.c
     src/lmath.h
     src/main.c
+    src/textures.c
+    src/textures.h
     src/utils.c
     src/utils.h
 )

@@ -1,6 +1,7 @@
 #ifndef CHUNK_H
 #define CHUNK_H
 #include <stddef.h>
+#include <stdbool.h>
 
 #include "block.h"
 
@@ -13,6 +14,8 @@ struct chunk {
     int x;
     int y;
     int z;
+
+    bool is_dirty;
 
     enum block_type blocks[CHUNK_VOLUME];
 };

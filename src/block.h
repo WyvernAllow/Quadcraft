@@ -3,6 +3,9 @@
 
 #include <stddef.h>
 #include <stdio.h>
+#include <stdbool.h>
+
+#include "textures.h"
 
 enum direction {
     DIR_POS_X,
@@ -19,8 +22,19 @@ enum block_type {
     BLOCK_AIR,
     BLOCK_DIRT,
     BLOCK_STONE,
+    BLOCK_GRASS,
+    BLOCK_BRICK,
+    BLOCK_PLANKS,
+    BLOCK_LOG,
 
     BLOCK_TYPE_COUNT,
 };
+
+struct block_properties {
+    bool is_transparent;
+    enum texture_id textures[DIR_COUNT];
+};
+
+const struct block_properties *get_block_properties(enum block_type type);
 
 #endif /* BLOCK_H */
