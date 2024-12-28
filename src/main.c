@@ -1,3 +1,4 @@
+#include <assert.h>
 #include <math.h>
 #include <stb_image.h>
 #include <stdbool.h>
@@ -228,6 +229,53 @@ void glfw_scroll_callback(GLFWwindow *window, double x, double y) {
     printf("Block type: %i\n", place_block);
 }
 
+#define TEXTURE_SIZE 16
+
+static GLuint create_texture_array(void) {
+    size_t max_layers = TEXTURE_ID_COUNT;
+
+    GLuint texture_array;
+    glGenTextures(1, &texture_array);
+    glBindTexture(GL_TEXTURE_2D_ARRAY, texture_array);
+
+    glTexImage3D(GL_TEXTURE_2D_ARRAY, 0, GL_RGBA8, TEXTURE_SIZE, TEXTURE_SIZE,
+                 max_layers, 0, GL_RGBA, GL_UNSIGNED_BYTE, NULL);
+
+    uint8_t *error_texture =
+        gen_error_texture_rgba8(TEXTURE_SIZE, TEXTURE_SIZE);
+    glTexSubImage3D(GL_TEXTURE_2D_ARRAY, 0, 0, 0, TEXTURE_ERROR, TEXTURE_SIZE,
+                    TEXTURE_SIZE, 1, GL_RGBA, GL_UNSIGNED_BYTE, error_texture);
+
+    stbi_set_flip_vertically_on_load(true);
+
+    for (enum texture_id id = 1; id < TEXTURE_ID_COUNT; id++) {
+        const char *texture_path = get_texture_filename(id);
+
+        int w;
+        int h;
+        int num_channels;
+        unsigned char *data =
+            stbi_load(texture_path, &w, &h, &num_channels, STBI_rgb_alpha);
+        if (!data) {
+            fprintf(stderr, "Failed to load texture: %s\n", texture_path);
+            free(error_texture);
+            return 0;
+        }
+
+        assert(w == TEXTURE_SIZE && h == TEXTURE_SIZE && num_channels == 4);
+
+        glTexSubImage3D(GL_TEXTURE_2D_ARRAY, 0, 0, 0, id, TEXTURE_SIZE,
+                        TEXTURE_SIZE, 1, GL_RGBA, GL_UNSIGNED_BYTE, data);
+    }
+
+    glTexParameteri(GL_TEXTURE_2D_ARRAY, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
+    glTexParameteri(GL_TEXTURE_2D_ARRAY, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
+    glTexParameteri(GL_TEXTURE_2D_ARRAY, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
+    glTexParameteri(GL_TEXTURE_2D_ARRAY, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
+
+    return texture_array;
+}
+
 int main(void) {
     glfwSetErrorCallback(glfw_error_callback);
     if (!glfwInit()) {
@@ -329,58 +377,7 @@ int main(void) {
 
     glBindVertexArray(0);
 
-    GLuint texture_array;
-    glGenTextures(1, &texture_array);
-    glBindTexture(GL_TEXTURE_2D_ARRAY, texture_array);
-
-    size_t num_layers = TEXTURE_ID_COUNT;
-
-    glTexImage3D(GL_TEXTURE_2D_ARRAY,  // Target
-                 0,                    // Mipmap level
-                 GL_RGBA8,             // Internal format
-                 16,                   // Texture width
-                 16,                   // Texture height
-                 num_layers,           // Number of layers
-                 0,                    // Border (must be 0)
-                 GL_RGBA,              // Format of the pixel data
-                 GL_UNSIGNED_BYTE,     // Data type
-                 NULL);                // Data (NULL means uninitialized)
-
-    uint8_t *error_texture = gen_error_texture_rgba8(16, 16);
-    glTexSubImage3D(GL_TEXTURE_2D_ARRAY, 0, 0, 0, TEXTURE_ERROR, 16, 16, 1,
-                    GL_RGBA, GL_UNSIGNED_BYTE, error_texture);
-
-    stbi_set_flip_vertically_on_load(true);
-
-    for (enum texture_id id = 1; id < TEXTURE_ID_COUNT; id++) {
-        const char *texture_path = get_texture_filename(id);
-
-        int w;
-        int h;
-        int num_channels;
-        unsigned char *data =
-            stbi_load(texture_path, &w, &h, &num_channels, STBI_rgb_alpha);
-        if (!data) {
-            fprintf(stderr, "Failed to load texture: %s\n", texture_path);
-            free(error_texture);
-            return EXIT_FAILURE;
-        }
-
-        if (w != 16 || h != 16 || num_channels != 4) {
-            fprintf(stderr,
-                    "Texture dimensions are not 16x16 or have 4 channels\n");
-            free(error_texture);
-            return EXIT_FAILURE;
-        }
-
-        glTexSubImage3D(GL_TEXTURE_2D_ARRAY, 0, 0, 0, id, 16, 16, 1, GL_RGBA,
-                        GL_UNSIGNED_BYTE, data);
-    }
-
-    glTexParameteri(GL_TEXTURE_2D_ARRAY, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
-    glTexParameteri(GL_TEXTURE_2D_ARRAY, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
-    glTexParameteri(GL_TEXTURE_2D_ARRAY, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
-    glTexParameteri(GL_TEXTURE_2D_ARRAY, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
+    GLuint texture_array = create_texture_array();
 
     camera_init(&camera, 90.0f, 800.0f / 450.0f);
 
