@@ -188,7 +188,8 @@ void mesh_chunk(struct chunk *chunk) {
                     for (enum direction dir = 0; dir < DIR_COUNT; dir++) {
                         struct vec3 position = {x, y, z};
 
-                        const struct block_properties *properties = get_block_properties(current_block);
+                        const struct block_properties *properties =
+                            get_block_properties(current_block);
 
                         struct vec3 normal = NORMAL_LUT[dir];
                         struct vec3 adjacent = vec3_add(position, normal);
@@ -218,10 +219,9 @@ void glfw_scroll_callback(GLFWwindow *window, double x, double y) {
     (void)window;
     (void)x;
 
-    if(y < 0) {
+    if (y < 0) {
         place_block = (place_block - 1) % BLOCK_TYPE_COUNT;
-    }
-    else if(y > 0) {
+    } else if (y > 0) {
         place_block = (place_block + 1) % BLOCK_TYPE_COUNT;
     }
 
@@ -340,14 +340,15 @@ int main(void) {
                  GL_RGBA8,             // Internal format
                  16,                   // Texture width
                  16,                   // Texture height
-                 num_layers,                  // Number of layers
+                 num_layers,           // Number of layers
                  0,                    // Border (must be 0)
                  GL_RGBA,              // Format of the pixel data
                  GL_UNSIGNED_BYTE,     // Data type
                  NULL);                // Data (NULL means uninitialized)
 
     uint8_t *error_texture = gen_error_texture_rgba8(16, 16);
-    glTexSubImage3D(GL_TEXTURE_2D_ARRAY, 0, 0, 0, TEXTURE_ERROR, 16, 16, 1, GL_RGBA, GL_UNSIGNED_BYTE, error_texture);
+    glTexSubImage3D(GL_TEXTURE_2D_ARRAY, 0, 0, 0, TEXTURE_ERROR, 16, 16, 1,
+                    GL_RGBA, GL_UNSIGNED_BYTE, error_texture);
 
     stbi_set_flip_vertically_on_load(true);
 
@@ -372,7 +373,8 @@ int main(void) {
             return EXIT_FAILURE;
         }
 
-        glTexSubImage3D(GL_TEXTURE_2D_ARRAY, 0, 0, 0, id, 16, 16, 1, GL_RGBA, GL_UNSIGNED_BYTE, data);
+        glTexSubImage3D(GL_TEXTURE_2D_ARRAY, 0, 0, 0, id, 16, 16, 1, GL_RGBA,
+                        GL_UNSIGNED_BYTE, data);
     }
 
     glTexParameteri(GL_TEXTURE_2D_ARRAY, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
