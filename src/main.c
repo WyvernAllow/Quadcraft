@@ -19,12 +19,12 @@ static void glfw_error_callback(int error_code, const char *description) {
     fprintf(stderr, "GLFW: %s\n", description);
 }
 
-struct camera camera;
+struct camera cam;
 
 static void glfw_framebuffer_size_callback(GLFWwindow *window, int width,
                                            int height) {
     (void)window;
-    camera.aspect = width / (float)height;
+    cam.aspect = width / (float)height;
     glViewport(0, 0, width, height);
 }
 
@@ -52,8 +52,8 @@ static void glfw_cursor_pos_callback(GLFWwindow *window, double x, double y) {
     last_x = x;
     last_y = y;
 
-    camera.pitch_deg -= delta_y * 0.25f;
-    camera.yaw_deg += delta_x * 0.25f;
+    cam.pitch_deg -= delta_y * 0.25f;
+    cam.yaw_deg += delta_x * 0.25f;
 }
 
 static void glfw_key_callback(GLFWwindow *window, int key, int scancode,
@@ -214,7 +214,7 @@ void mesh_chunk(struct chunk *chunk) {
     printf("Buffer usage: %.2f%%\n", buffer_usage);
 }
 
-enum block_type place_block = BLOCK_STONE;
+block_type place_block = BLOCK_STONE;
 
 void glfw_scroll_callback(GLFWwindow *window, double x, double y) {
     (void)window;
@@ -317,7 +317,7 @@ int main(void) {
     glEnable(GL_DEPTH_TEST);
     // glPolygonMode(GL_FRONT_AND_BACK, GL_LINE);
 
-    struct chunk chunk0;
+    chunk chunk0;
     chunk_init(&chunk0);
 
     GLuint program =
@@ -379,11 +379,11 @@ int main(void) {
 
     GLuint texture_array = create_texture_array();
 
-    camera_init(&camera, 90.0f, 800.0f / 450.0f);
+    camera_init(&cam, 90.0f, 800.0f / 450.0f);
 
-    camera.position.z = 3.0f;
+    cam.position.z = 3.0f;
 
-    camera_update(&camera);
+    camera_update(&cam);
 
     float current_time = glfwGetTime();
 
@@ -395,17 +395,17 @@ int main(void) {
         current_time = new_time;
 
         if (glfwGetMouseButton(window, GLFW_MOUSE_BUTTON_1)) {
-            int x = (int)(camera.position.x + camera.forward.x);
-            int y = (int)(camera.position.y + camera.forward.y);
-            int z = (int)(camera.position.z + camera.forward.z);
+            int x = (int)(cam.position.x + cam.forward.x);
+            int y = (int)(cam.position.y + cam.forward.y);
+            int z = (int)(cam.position.z + cam.forward.z);
 
             chunk_set_block(&chunk0, x, y, z, BLOCK_AIR);
         }
 
         if (glfwGetMouseButton(window, GLFW_MOUSE_BUTTON_2)) {
-            int x = (int)(camera.position.x + camera.forward.x);
-            int y = (int)(camera.position.y + camera.forward.y);
-            int z = (int)(camera.position.z + camera.forward.z);
+            int x = (int)(cam.position.x + cam.forward.x);
+            int y = (int)(cam.position.y + cam.forward.y);
+            int z = (int)(cam.position.z + cam.forward.z);
 
             chunk_set_block(&chunk0, x, y, z, place_block);
         }
@@ -421,26 +421,26 @@ int main(void) {
 
         struct vec3 wishdir = {0};
         if (glfwGetKey(window, GLFW_KEY_W) == GLFW_PRESS) {
-            wishdir = vec3_add(wishdir, camera.forward);
+            wishdir = vec3_add(wishdir, cam.forward);
         }
 
         if (glfwGetKey(window, GLFW_KEY_S) == GLFW_PRESS) {
-            wishdir = vec3_sub(wishdir, camera.forward);
+            wishdir = vec3_sub(wishdir, cam.forward);
         }
 
         if (glfwGetKey(window, GLFW_KEY_A) == GLFW_PRESS) {
-            wishdir = vec3_sub(wishdir, camera.right);
+            wishdir = vec3_sub(wishdir, cam.right);
         }
 
         if (glfwGetKey(window, GLFW_KEY_D) == GLFW_PRESS) {
-            wishdir = vec3_add(wishdir, camera.right);
+            wishdir = vec3_add(wishdir, cam.right);
         }
 
-        camera.position =
-            vec3_add(camera.position,
+        cam.position =
+            vec3_add(cam.position,
                      vec3_scale(vec3_normalize(wishdir), delta_time * 5.0f));
 
-        camera_update(&camera);
+        camera_update(&cam);
 
         glClearColor(0.2f, 0.3f, 0.3f, 1.0f);
         glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
@@ -452,7 +452,7 @@ int main(void) {
 
         glBindVertexArray(vao);
         glUniformMatrix4fv(glGetUniformLocation(program, "u_mvp"), 1, GL_FALSE,
-                           camera.view_proj.m);
+                           cam.view_proj.m);
 
         size_t quad_count = (vertex_count / 4);
 

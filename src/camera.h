@@ -2,11 +2,11 @@
 #define CAMERA_H
 #include "lmath.h"
 
-struct camera {
-    struct vec3 position;
-    struct vec3 forward;
-    struct vec3 right;
-    struct vec3 up;
+typedef struct camera {
+    vec3 position;
+    vec3 forward;
+    vec3 right;
+    vec3 up;
 
     float pitch_deg;
     float yaw_deg;
@@ -16,12 +16,12 @@ struct camera {
     float near;
     float far;
 
-    struct mat4 view;
-    struct mat4 proj;
-    struct mat4 view_proj;
-};
+    mat4 view;
+    mat4 proj;
+    mat4 view_proj;
+} camera;
 
-void camera_init(struct camera *cam, float fov_deg, float aspect);
-void camera_update(struct camera *cam);
+void camera_init(camera *cam, float fov_deg, float aspect);
+void camera_update(camera *cam);
 
 #endif /* CAMERA_H */

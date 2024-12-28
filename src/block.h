@@ -4,7 +4,7 @@
 #include <stdbool.h>
 #include <stddef.h>
 
-enum texture_id {
+typedef enum texture_id {
     TEXTURE_ERROR,
     TEXTURE_DIRT,
     TEXTURE_GRASS_TOP,
@@ -16,11 +16,11 @@ enum texture_id {
     TEXTURE_BRICK,
 
     TEXTURE_ID_COUNT,
-};
+} texture_id;
 
-const char *get_texture_filename(enum texture_id id);
+const char *get_texture_filename(texture_id id);
 
-enum direction {
+typedef enum direction {
     DIR_POS_X,
     DIR_POS_Y,
     DIR_POS_Z,
@@ -29,9 +29,9 @@ enum direction {
     DIR_NEG_Z,
 
     DIR_COUNT,
-};
+} direction;
 
-enum block_type {
+typedef enum block_type {
     BLOCK_AIR,
     BLOCK_DIRT,
     BLOCK_STONE,
@@ -41,13 +41,13 @@ enum block_type {
     BLOCK_LOG,
 
     BLOCK_TYPE_COUNT,
-};
+} block_type;
 
-struct block_properties {
+typedef struct block_properties {
     bool is_transparent;
-    enum texture_id textures[DIR_COUNT];
-};
+    texture_id textures[DIR_COUNT];
+} block_properties;
 
-const struct block_properties *get_block_properties(enum block_type type);
+const block_properties *get_block_properties(block_type type);
 
 #endif /* BLOCK_H */

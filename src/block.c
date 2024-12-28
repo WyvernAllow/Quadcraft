@@ -11,12 +11,12 @@ static const char *texture_filenames[TEXTURE_ID_COUNT] = {
     [TEXTURE_BRICK] = "res/textures/brick.png",
 };
 
-const char *get_texture_filename(enum texture_id id) {
+const char *get_texture_filename(texture_id id) {
     return texture_filenames[id];
 }
 
 // clang-format off
-static const struct block_properties block_table[BLOCK_TYPE_COUNT] = {
+static const block_properties block_table[BLOCK_TYPE_COUNT] = {
     [BLOCK_AIR] = {
         .is_transparent = true,
         .textures = {0},
@@ -91,6 +91,6 @@ static const struct block_properties block_table[BLOCK_TYPE_COUNT] = {
 };
 // clang-format on
 
-const struct block_properties *get_block_properties(enum block_type type) {
+const block_properties *get_block_properties(block_type type) {
     return &block_table[type];
 }
