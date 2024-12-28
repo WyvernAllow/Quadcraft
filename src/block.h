@@ -3,8 +3,6 @@
 
 #include <stdbool.h>
 #include <stddef.h>
-#include <stdio.h>
-
 
 enum texture_id {
     TEXTURE_ERROR,
