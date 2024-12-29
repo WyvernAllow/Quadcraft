@@ -11,10 +11,10 @@ static size_t get_index(int x, int y, int z) {
     return x + y * CHUNK_SIZE_X + z * CHUNK_SIZE_X * CHUNK_SIZE_Y;
 }
 
-void chunk_init(chunk *chunk) {
-    chunk->x = 0;
-    chunk->y = 0;
-    chunk->z = 0;
+void chunk_init(chunk *chunk, int x, int y, int z) {
+    chunk->x = x;
+    chunk->y = y;
+    chunk->z = z;
 
     for (size_t z = 0; z < CHUNK_SIZE_Z; z++) {
         for (size_t y = 0; y < CHUNK_SIZE_Y; y++) {

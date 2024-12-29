@@ -20,7 +20,7 @@ typedef struct chunk {
     block_type blocks[CHUNK_VOLUME];
 } chunk;
 
-void chunk_init(chunk *chunk);
+void chunk_init(chunk *chunk, int x, int y, int z);
 block_type chunk_get_block(const chunk *chunk, int x, int y, int z);
 void chunk_set_block(chunk *chunk, int x, int y, int z, block_type type);
 

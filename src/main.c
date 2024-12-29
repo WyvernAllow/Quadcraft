@@ -268,7 +268,8 @@ static GLuint create_texture_array(void) {
                         TEXTURE_SIZE, 1, GL_RGBA, GL_UNSIGNED_BYTE, data);
     }
 
-    glTexParameteri(GL_TEXTURE_2D_ARRAY, GL_TEXTURE_MIN_FILTER, GL_NEAREST_MIPMAP_LINEAR);
+    glTexParameteri(GL_TEXTURE_2D_ARRAY, GL_TEXTURE_MIN_FILTER,
+                    GL_NEAREST_MIPMAP_LINEAR);
     glTexParameteri(GL_TEXTURE_2D_ARRAY, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
     glTexParameteri(GL_TEXTURE_2D_ARRAY, GL_TEXTURE_WRAP_S, GL_REPEAT);
     glTexParameteri(GL_TEXTURE_2D_ARRAY, GL_TEXTURE_WRAP_T, GL_REPEAT);
@@ -320,7 +321,7 @@ int main(void) {
     // glPolygonMode(GL_FRONT_AND_BACK, GL_LINE);
 
     chunk *chunk0 = malloc(sizeof(chunk));
-    chunk_init(chunk0);
+    chunk_init(chunk0, 0, 0, 0);
 
     GLuint program =
         load_program("res/shaders/chunk.vert", "res/shaders/chunk.frag");
