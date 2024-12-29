@@ -8,7 +8,7 @@ in float v_layer;
 uniform sampler2DArray u_texture;
 
 void main() {
-    vec2 uv = fract(vec2(dot(v_normal.xzy, v_position.zxx), v_position.y + v_normal.y * v_position.z));
+    vec2 uv = vec2(dot(v_normal.xzy, v_position.zxx), v_position.y + v_normal.y * v_position.z);
     
     float num_layers = textureSize(u_texture, 0).z;
     float layer = v_layer * float(v_layer < num_layers);

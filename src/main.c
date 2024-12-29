@@ -268,10 +268,12 @@ static GLuint create_texture_array(void) {
                         TEXTURE_SIZE, 1, GL_RGBA, GL_UNSIGNED_BYTE, data);
     }
 
-    glTexParameteri(GL_TEXTURE_2D_ARRAY, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
+    glTexParameteri(GL_TEXTURE_2D_ARRAY, GL_TEXTURE_MIN_FILTER, GL_NEAREST_MIPMAP_LINEAR);
     glTexParameteri(GL_TEXTURE_2D_ARRAY, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
-    glTexParameteri(GL_TEXTURE_2D_ARRAY, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
-    glTexParameteri(GL_TEXTURE_2D_ARRAY, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
+    glTexParameteri(GL_TEXTURE_2D_ARRAY, GL_TEXTURE_WRAP_S, GL_REPEAT);
+    glTexParameteri(GL_TEXTURE_2D_ARRAY, GL_TEXTURE_WRAP_T, GL_REPEAT);
+
+    glGenerateMipmap(GL_TEXTURE_2D_ARRAY);
 
     return texture_array;
 }
@@ -317,8 +319,8 @@ int main(void) {
     glEnable(GL_DEPTH_TEST);
     // glPolygonMode(GL_FRONT_AND_BACK, GL_LINE);
 
-    chunk chunk0;
-    chunk_init(&chunk0);
+    chunk *chunk0 = malloc(sizeof(chunk));
+    chunk_init(chunk0);
 
     GLuint program =
         load_program("res/shaders/chunk.vert", "res/shaders/chunk.frag");
@@ -342,7 +344,7 @@ int main(void) {
 
     vertices = malloc(sizeof(struct vertex) * MAX_VERTEX_COUNT);
 
-    mesh_chunk(&chunk0);
+    mesh_chunk(chunk0);
 
     GLuint vao;
     glGenVertexArrays(1, &vao);
@@ -399,7 +401,7 @@ int main(void) {
             int y = (int)(cam.position.y + cam.forward.y);
             int z = (int)(cam.position.z + cam.forward.z);
 
-            chunk_set_block(&chunk0, x, y, z, BLOCK_AIR);
+            chunk_set_block(chunk0, x, y, z, BLOCK_AIR);
         }
 
         if (glfwGetMouseButton(window, GLFW_MOUSE_BUTTON_2)) {
@@ -407,16 +409,16 @@ int main(void) {
             int y = (int)(cam.position.y + cam.forward.y);
             int z = (int)(cam.position.z + cam.forward.z);
 
-            chunk_set_block(&chunk0, x, y, z, place_block);
+            chunk_set_block(chunk0, x, y, z, place_block);
         }
 
-        if (chunk0.is_dirty) {
-            mesh_chunk(&chunk0);
+        if (chunk0->is_dirty) {
+            mesh_chunk(chunk0);
 
             glBindBuffer(GL_ARRAY_BUFFER, vbo);
             glBufferSubData(GL_ARRAY_BUFFER, 0,
                             sizeof(struct vertex) * vertex_count, vertices);
-            chunk0.is_dirty = false;
+            chunk0->is_dirty = false;
         }
 
         struct vec3 wishdir = {0};
